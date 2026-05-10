@@ -1,0 +1,7 @@
+condition,model,accuracy,f1,roc_auc
+without_pressure,logistic,0.7578,0.7627,0.8517
+without_pressure,random_forest,0.7546,0.7568,0.8537
+without_pressure,xgboost,0.7603,0.7637,0.8566
+with_pressure,logistic,0.7579,0.7638,0.8554
+with_pressure,random_forest,0.7549,0.7576,0.8533
+with_pressure,xgboost,0.7625,0.7662,0.8567

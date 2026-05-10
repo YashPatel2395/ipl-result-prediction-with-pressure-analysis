@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IPL Chase Pressure Predictor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════ HEADER ═══════════════════════ -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <span class="brand-icon">🏏</span>
+        <div>
+          <h1 class="brand-title">IPL Chase Pressure Predictor</h1>
+          <p class="brand-sub">Second-innings ball-by-ball win probability · ML-powered</p>
+        </div>
+      </div>
+      <div class="header-badge">
+        <span class="badge-dot"></span>
+        <span>Second Innings Only</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════ MAIN ═══════════════════════ -->
+  <main class="main-layout">
+
+    <!-- ─── LEFT: INPUT FORM ─── -->
+    <section class="panel panel-form">
+      <div class="panel-header">
+        <h2>Match State</h2>
+        <p class="panel-subtitle">Enter the current live match situation</p>
+      </div>
+
+      <form id="predict-form" novalidate>
+
+        <!-- Target -->
+        <div class="field-group">
+          <label class="field-label" for="target_score">
+            Target Score
+            <span class="field-hint">Runs the chasing team needs to win</span>
+          </label>
+          <div class="input-wrap">
+            <input type="number" id="target_score" name="target_score"
+                   class="field-input" placeholder="e.g. 185"
+                   min="1" max="500" required />
+            <span class="input-unit">runs</span>
+          </div>
+          <span class="field-error" id="err-target_score"></span>
+        </div>
+
+        <!-- Current Score -->
+        <div class="field-group">
+          <label class="field-label" for="current_score">
+            Current Score
+            <span class="field-hint">Runs scored so far in the chase</span>
+          </label>
+          <div class="input-wrap">
+            <input type="number" id="current_score" name="current_score"
+                   class="field-input" placeholder="e.g. 94"
+                   min="0" max="499" required />
+            <span class="input-unit">runs</span>
+          </div>
+          <span class="field-error" id="err-current_score"></span>
+        </div>
+
+        <!-- Balls Completed -->
+        <div class="field-group">
+          <label class="field-label" for="balls_completed">
+            Balls Bowled
+            <span class="field-hint">Total legal deliveries (3.2 overs = 20 balls)</span>
+          </label>
+          <div class="input-wrap">
+            <input type="number" id="balls_completed" name="balls_completed"
+                   class="field-input" placeholder="e.g. 72"
+                   min="0" max="119" required />
+            <span class="input-unit">balls</span>
+          </div>
+          <div class="over-preview" id="over-preview"></div>
+          <span class="field-error" id="err-balls_completed"></span>
+        </div>
+
+        <!-- Wickets Lost -->
+        <div class="field-group">
+          <label class="field-label" for="wickets_lost">
+            Wickets Lost
+            <span class="field-hint">How many wickets have fallen</span>
+          </label>
+          <div class="wicket-selector" id="wicket-selector">
+            <!-- Filled dynamically by JS -->
+          </div>
+          <input type="hidden" id="wickets_lost" name="wickets_lost" value="0" />
+          <span class="field-error" id="err-wickets_lost"></span>
+        </div>
+
+        <!-- Toss Decision -->
+        <div class="field-group">
+          <label class="field-label" for="toss_decision">
+            Toss Winner's Choice
+            <span class="field-hint">What the toss-winning captain decided</span>
+          </label>
+          <div class="select-wrap">
+            <select id="toss_decision" name="toss_decision" class="field-select">
+              <option value="field">Field first (then chase)</option>
+              <option value="bat">Bat first (then defend)</option>
+            </select>
+          </div>
+          <span class="field-error" id="err-toss_decision"></span>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit" class="btn-predict" id="predict-btn">
+          <span class="btn-text">Predict Win Probability</span>
+          <span class="btn-spinner" hidden>
+            <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="31.4" stroke-dashoffset="10"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/></circle></svg>
+            Predicting…
+          </span>
+        </button>
+
+        <!-- Global error -->
+        <div class="alert alert-error" id="global-error" hidden>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="global-error-msg"></span>
+        </div>
+      </form>
+
+      <!-- Model info card -->
+      <div class="model-info">
+        <div class="model-info-row">
+          <span class="model-info-label">Model</span>
+          <span class="model-info-val">XGBoost (14-feature static)</span>
+        </div>
+        <div class="model-info-row">
+          <span class="model-info-label">Training data</span>
+          <span class="model-info-val">1,090 IPL matches · 125k+ ball-states</span>
+        </div>
+        <div class="model-info-row">
+          <span class="model-info-label">ROC-AUC</span>
+          <span class="model-info-val">0.856</span>
+        </div>
+        <div class="model-info-row">
+          <span class="model-info-label">Task</span>
+          <span class="model-info-val">Second innings chase only</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── RIGHT: RESULTS DASHBOARD ─── -->
+    <section class="panel panel-results" id="results-panel">
+
+      <!-- Empty state -->
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">📊</div>
+        <h3>No prediction yet</h3>
+        <p>Enter the current match state on the left and click <strong>Predict Win Probability</strong>.</p>
+        <ul class="empty-hints">
+          <li>Works only for second-innings chase scenarios</li>
+          <li>Needs at least 1 ball bowled for a run rate</li>
+          <li>Results update instantly after each prediction</li>
+        </ul>
+      </div>
+
+      <!-- Results (hidden until first prediction) -->
+      <div class="results-content" id="results-content" hidden>
+
+        <!-- Win probability gauge -->
+        <div class="gauge-section">
+          <div class="gauge-wrapper">
+            <svg class="gauge-svg" viewBox="0 0 220 220" aria-label="Win probability gauge">
+              <!-- Track -->
+              <circle cx="110" cy="110" r="90" fill="none"
+                      stroke="rgba(255,255,255,0.06)" stroke-width="18"/>
+              <!-- Arc — filled by JS -->
+              <circle id="gauge-arc" cx="110" cy="110" r="90" fill="none"
+                      stroke="#22C55E" stroke-width="18"
+                      stroke-linecap="round"
+                      stroke-dasharray="565.5 565.5"
+                      transform="rotate(-90 110 110)"/>
+              <!-- Center -->
+              <text id="gauge-pct" x="110" y="100" text-anchor="middle"
+                    dominant-baseline="middle" class="gauge-pct-text">--%</text>
+              <text x="110" y="130" text-anchor="middle"
+                    class="gauge-label-text">WIN PROB</text>
+            </svg>
+          </div>
+
+          <div class="gauge-meta">
+            <div class="gauge-meta-row">
+              <span class="gauge-meta-label">Batting team advantage</span>
+              <div class="vs-bar-wrap">
+                <div class="vs-bar">
+                  <div class="vs-bar-win" id="vs-bar-win" style="width:50%"></div>
+                </div>
+                <div class="vs-labels">
+                  <span id="vs-win-label" class="vs-win">50%</span>
+                  <span id="vs-lose-label" class="vs-lose">50%</span>
+                </div>
+              </div>
+            </div>
+            <p class="explanation-text" id="explanation-text"></p>
+          </div>
+        </div>
+
+        <hr class="results-divider" />
+
+        <!-- Key stats row -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-icon">🎯</span>
+            <span class="stat-val" id="stat-runs">--</span>
+            <span class="stat-label">Runs Needed</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon">⏳</span>
+            <span class="stat-val" id="stat-overs">--</span>
+            <span class="stat-label">Overs Left</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon">🏏</span>
+            <span class="stat-val" id="stat-wickets">--</span>
+            <span class="stat-label">Wickets in Hand</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon">📍</span>
+            <span class="stat-val" id="stat-phase">--</span>
+            <span class="stat-label">Phase</span>
+          </div>
+        </div>
+
+        <hr class="results-divider" />
+
+        <!-- Run rate comparison -->
+        <div class="rate-section">
+          <h3 class="section-title">Run Rate Comparison</h3>
+          <div class="rate-cards">
+            <div class="rate-card rate-crr">
+              <span class="rate-label">Current RR</span>
+              <span class="rate-val" id="crr-val">--</span>
+              <span class="rate-desc">Runs per over scored</span>
+            </div>
+            <div class="rate-divider">
+              <span id="rate-indicator">vs</span>
+            </div>
+            <div class="rate-card rate-rrr">
+              <span class="rate-label">Required RR</span>
+              <span class="rate-val" id="rrr-val">--</span>
+              <span class="rate-desc">Runs per over needed</span>
+            </div>
+          </div>
+          <div class="rate-gap-bar-wrap">
+            <div class="rate-gap-bar" id="rate-gap-bar">
+              <div class="rate-gap-fill" id="rate-gap-fill"></div>
+            </div>
+            <p class="rate-gap-note" id="rate-gap-note"></p>
+          </div>
+        </div>
+
+        <hr class="results-divider" />
+
+        <!-- Pressure section -->
+        <div class="pressure-section">
+          <h3 class="section-title">Pressure Analysis</h3>
+          <div class="pressure-header">
+            <div class="pressure-score-wrap">
+              <span class="pressure-score-label">Pressure Score</span>
+              <span class="pressure-score" id="pressure-score">--</span>
+            </div>
+            <div class="pressure-zone-badge" id="pressure-zone-badge">
+              <span id="pressure-zone-name">--</span>
+            </div>
+          </div>
+
+          <div class="pressure-bar-wrap">
+            <div class="pressure-bar">
+              <div class="pressure-fill" id="pressure-fill"></div>
+            </div>
+            <div class="pressure-bar-labels">
+              <span>Comfortable</span>
+              <span>Building</span>
+              <span>Escalating</span>
+              <span>Panic</span>
+            </div>
+          </div>
+
+          <!-- Pressure decomposition -->
+          <div class="pressure-breakdown">
+            <span class="breakdown-title">Formula breakdown:</span>
+            <div class="breakdown-chips">
+              <div class="breakdown-chip">
+                <span class="chip-label">Rate Ratio</span>
+                <span class="chip-val" id="comp-rate-ratio">--</span>
+              </div>
+              <span class="breakdown-op">×</span>
+              <div class="breakdown-chip">
+                <span class="chip-label">Wicket Factor</span>
+                <span class="chip-val" id="comp-wicket-factor">--</span>
+              </div>
+              <span class="breakdown-op">×</span>
+              <div class="breakdown-chip">
+                <span class="chip-label">Time Factor</span>
+                <span class="chip-val" id="comp-time-factor">--</span>
+              </div>
+              <span class="breakdown-op">=</span>
+              <div class="breakdown-chip breakdown-chip-result">
+                <span class="chip-label">Pressure</span>
+                <span class="chip-val" id="comp-pressure">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /results-content -->
+    </section>
+
+  </main><!-- /main-layout -->
+
+  <!-- ═══════════════════════ FOOTER ═══════════════════════ -->
+  <footer class="site-footer">
+    <p>
+      IPL Chase Pressure Predictor &nbsp;·&nbsp;
+      XGBoost trained on 1,090 IPL matches &nbsp;·&nbsp;
+      <strong>Second-innings chase prediction only</strong> &nbsp;·&nbsp;
+      Not affiliated with IPL or BCCI
+    </p>
+  </footer>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

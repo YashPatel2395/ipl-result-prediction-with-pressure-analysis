@@ -1,0 +1,7 @@
+accuracy,f1,roc_auc,brier,config,model,n_features
+0.7598,0.7635,0.8556,0.15709,A_static,xgboost,14
+0.7579,0.7638,0.8554,0.15688,A_static,logistic,14
+0.7603,0.7649,0.8557,0.15725,B_static+momentum,xgboost,32
+0.759,0.7644,0.856,0.15653,B_static+momentum,logistic,32
+0.7594,0.764,0.8546,0.15784,C_full_dynamic,xgboost,38
+0.76,0.7652,0.8557,0.15691,C_full_dynamic,logistic,38

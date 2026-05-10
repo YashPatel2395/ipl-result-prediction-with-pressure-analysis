@@ -1,0 +1,16 @@
+DATA LEAKAGE AUDIT REPORT
+============================================================
+
+[PASS] L1 — Feature Leakage
+       No future/outcome columns found in feature set.
+
+[WARN] L2 — Temporal Leakage
+       400 rows where current_score > target_score (these represent the final winning ball — acceptable if kept, but should not inform the model about the future).
+
+[PASS] L3 — Train/Test Split Leakage
+       Clean split: 872 train matches, 218 test matches, 0 overlap.
+
+[PASS] L4 — Target Isolation
+       Target 'won' is binary and isolated from all features.
+
+Overall: ALL CHECKS PASSED
